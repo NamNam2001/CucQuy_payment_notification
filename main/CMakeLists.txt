@@ -30,13 +30,12 @@ idf_component_register(SRCS ${SOURCES}
                         # ESP-IDF built-in components
                         nvs_flash
                         esp_event
-                        esp_wifi
-                        esp_netif
                         mqtt
                         esp_driver_gpio
                         esp_driver_spi
                         esp_driver_i2s
                         json
                         esp_http_client
-                        # Managed components (esp_lvgl_port + lvgl + esp_audio_codec tự kéo qua dependencies)
+                        # Managed components
+                        # (esp_lvgl_port + lvgl + esp_audio_codec + 78/esp-wifi-connect tự kéo qua dependencies)
                     )

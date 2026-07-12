@@ -29,6 +29,18 @@ esp_err_t display_show_qr(const char *emv_payload, int amount_vnd, const char *o
  */
 esp_err_t display_show_home(void);
 
+/**
+ * @brief Hiển thị màn hình config mode:
+ *        "Vao WiFi: NamPOS-XXXX" + "Cau hinh: 192.168.4.1"
+ */
+esp_err_t display_show_config_mode(const char *ap_name);
+
+/**
+ * @brief Cập nhật WiFi icon ở góc phải màn Home.
+ *        connected=true: icon đầy (có sóng). false: icon mờ/dấu X.
+ */
+esp_err_t display_set_wifi_status(bool connected);
+
 /** Cập nhật dòng tiêu đề phía trên (optional). */
 esp_err_t display_set_title(const char *text);
 

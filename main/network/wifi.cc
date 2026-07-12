@@ -1,129 +1,159 @@
 /**
  * @file wifi.cc
- * @brief WiFi Station dùng esp_wifi built-in ESP-IDF.
+ * @brief WiFi Manager wrapper dùng 78/esp-wifi-connect.
  *
- * Khác với xiaozhi (dùng 78/esp-wifi-connect), ở đây tự connect trực tiếp
- * với SSID/password hardcode trong config.h. Đơn giản, không phụ thuộc ngoài.
- *
- * Luồng:
- *   nvs_flash_init -> esp_netif_init -> event_loop_create ->
- *   esp_netif_create_default_wifi_sta -> esp_wifi_init ->
- *   register event handler (WIFI_EVENT + IP_EVENT) ->
- *   esp_wifi_set_config -> esp_wifi_start ->
- *   (esp_wifi_connect nội bộ) -> IP_EVENT_STA_GOT_IP -> connected_cb
+ * Tham chiếu: xiaozhi-esp32/main/boards/common/wifi_board.cc
+ *   - WifiManager::Initialize (tự NVS + netif + event loop + wifi driver)
+ *   - SsidManager check có SSID saved không
+ *   - StartStation hoặc StartConfigAp
+ *   - 60s timeout fallback -> config AP
+ *   - Event callback: Connected -> start MQTT
  */
 #include "wifi.h"
 #include "config.h"
+#include "display/display.h"
 
 #include <esp_log.h>
-#include <string.h>
-#include <nvs_flash.h>
-#include <esp_event.h>
+#include <esp_timer.h>
 #include <esp_wifi.h>
-#include <esp_netif.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/event_groups.h>
+#include <freertos/task.h>
+#include <wifi_manager.h>
+#include <ssid_manager.h>
 
 static const char *TAG = "wifi";
 
-#define WIFI_CONNECTED_BIT  BIT0
-#define WIFI_FAIL_BIT       BIT1
-
-static EventGroupHandle_t s_wifi_event_group = nullptr;
 static wifi_connected_cb_t    s_connected_cb    = nullptr;
 static wifi_disconnected_cb_t s_disconnected_cb = nullptr;
-static int s_retry_count = 0;
+static esp_timer_handle_t     s_connect_timer   = nullptr;
+static bool                    s_connected       = false;
 
-static void event_handler(void *arg, esp_event_base_t event_base,
-                          int32_t event_id, void *event_data)
+// ---------------------------------------------------------------------------
+// 60s timeout -> nếu station không connect được -> vào config AP
+// ---------------------------------------------------------------------------
+static void connect_timeout_callback(void *arg)
 {
-    if (event_base == WIFI_EVENT) {
-        switch (event_id) {
-        case WIFI_EVENT_STA_START:
-            esp_wifi_connect();
-            break;
-        case WIFI_EVENT_STA_DISCONNECTED: {
-            if (s_retry_count < 5) {
-                esp_wifi_connect();
-                s_retry_count++;
-                ESP_LOGW(TAG, "retry connect #%d", s_retry_count);
-            } else {
-                xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-                if (s_disconnected_cb) s_disconnected_cb();
-            }
-            break;
-        }
-        default: break;
-        }
-    } else if (event_base == IP_EVENT) {
-        if (event_id == IP_EVENT_STA_GOT_IP) {
-            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-            ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-            s_retry_count = 0;
-            xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-            if (s_connected_cb) s_connected_cb();
-        }
+    ESP_LOGW(TAG, "Station connect timeout %ds -> vào config AP", WIFI_CONNECT_TIMEOUT_SEC);
+    WifiManager::GetInstance().StopStation();
+    WifiManager::GetInstance().StartConfigAp();
+}
+
+// ---------------------------------------------------------------------------
+// WiFi event callback (chạy trong WiFi event task)
+// ---------------------------------------------------------------------------
+static void on_wifi_event(WifiEvent event, const std::string &data)
+{
+    switch (event) {
+    case WifiEvent::Connected:
+        ESP_LOGI(TAG, "Connected to '%s'", data.c_str());
+        s_connected = true;
+        display_set_wifi_status(true);           // icon WiFi xanh
+        if (s_connect_timer) esp_timer_stop(s_connect_timer);
+        if (s_connected_cb) s_connected_cb();
+        break;
+
+    case WifiEvent::Disconnected:
+        ESP_LOGW(TAG, "Disconnected (reason %s)", data.c_str());
+        s_connected = false;
+        display_set_wifi_status(false);          // icon WiFi đỏ/X
+        if (s_disconnected_cb) s_disconnected_cb();
+        break;
+
+    case WifiEvent::ConfigModeEnter:
+        ESP_LOGI(TAG, "Config AP mode: AP='%s' URL=%s",
+                 WifiManager::GetInstance().GetApSsid().c_str(),
+                 WifiManager::GetInstance().GetApWebUrl().c_str());
+        // Hiển thị màn config mode cho user biết
+        display_show_config_mode(WifiManager::GetInstance().GetApSsid().c_str());
+        break;
+
+    case WifiEvent::ConfigModeExit:
+        // User đã submit form -> retry station với SSID mới
+        ESP_LOGI(TAG, "Config exit -> retry station");
+        display_show_home();                     // về màn Home
+        display_set_wifi_status(false);
+        esp_timer_start_once(s_connect_timer, (uint64_t)WIFI_CONNECT_TIMEOUT_SEC * 1000000ULL);
+        WifiManager::GetInstance().StartStation();
+        break;
+
+    case WifiEvent::Scanning:
+    case WifiEvent::Connecting:
+        break;
     }
 }
 
+// ---------------------------------------------------------------------------
+// Task cho enter_config_mode (tránh race condition)
+// ---------------------------------------------------------------------------
+static void enter_config_task(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(200));
+    if (s_connect_timer) esp_timer_stop(s_connect_timer);
+    WifiManager::GetInstance().StopStation();
+    WifiManager::GetInstance().StartConfigAp();
+    vTaskDelete(nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 esp_err_t wifi_init(void)
 {
-    // ---- 1. NVS (esp_wifi cần) ----
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+    ESP_LOGI(TAG, "Init WiFi manager (prefix=%s)", WIFI_AP_PREFIX);
+
+    // 1. Initialize WifiManager (tự NVS + netif + wifi driver)
+    WifiManagerConfig cfg;
+    cfg.ssid_prefix = WIFI_AP_PREFIX;
+    cfg.language     = "en-US";
+    if (!WifiManager::GetInstance().Initialize(cfg)) {
+        ESP_LOGE(TAG, "WifiManager Initialize failed");
+        return ESP_FAIL;
     }
-    ESP_ERROR_CHECK(ret);
 
-    s_wifi_event_group = xEventGroupCreate();
+    // 2. Tạo 60s connect timeout timer
+    esp_timer_create_args_t timer_args = {
+        .callback = connect_timeout_callback,
+        .arg = nullptr,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "wifi_timeout",
+        .skip_unhandled_events = true,
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &s_connect_timer));
 
-    // ---- 2. netif + event loop ----
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    // 3. Register event callback
+    WifiManager::GetInstance().SetEventCallback(on_wifi_event);
 
-    // ---- 3. wifi init với default config ----
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    // ---- 4. register event handler ----
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
-                                                        &event_handler, nullptr, &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                                        &event_handler, nullptr, &instance_got_ip));
-
-    // ---- 5. cấu hình STA ----
-    wifi_config_t wifi_config = {};
-    strncpy((char *)wifi_config.sta.ssid,     WIFI_SSID,     sizeof(wifi_config.sta.ssid));
-    strncpy((char *)wifi_config.sta.password, WIFI_PASSWORD, sizeof(wifi_config.sta.password));
-    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    ESP_LOGI(TAG, "wifi_init done - waiting for IP...");
-
-    // ---- 6. Chờ connected hoặc fail (block - gọi 1 lần lúc boot) ----
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                           pdFALSE, pdFALSE, portMAX_DELAY);
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s", WIFI_SSID);
-        return ESP_OK;
+    // 4. Decision: có SSID trong NVS?
+    bool have_ssid = !SsidManager::GetInstance().GetSsidList().empty();
+    if (have_ssid) {
+        ESP_LOGI(TAG, "Có SSID trong NVS -> StartStation");
+        esp_timer_start_once(s_connect_timer, (uint64_t)WIFI_CONNECT_TIMEOUT_SEC * 1000000ULL);
+        WifiManager::GetInstance().StartStation();
+    } else {
+        ESP_LOGI(TAG, "Chưa có SSID -> StartConfigAp (captive portal)");
+        // Chờ 1.5s cho display kịp hiện boot screen
+        vTaskDelay(pdMS_TO_TICKS(1500));
+        WifiManager::GetInstance().StartConfigAp();
     }
-    ESP_LOGE(TAG, "FAILED to connect to SSID:%s", WIFI_SSID);
-    return ESP_FAIL;
+
+    // 5. Set TX power MAX (20 dBm) cho cả station và AP
+    // ESP32 max = 20dBm (value 80). Mặc định có thể thấp hơn -> WiFi yếu.
+    esp_wifi_set_max_tx_power(80);
+    ESP_LOGI(TAG, "WiFi TX power set to MAX (20 dBm)");
+
+    return ESP_OK;
+}
+
+void wifi_enter_config_mode(void)
+{
+    ESP_LOGI(TAG, "Enter config mode (từ nút bấm)");
+    xTaskCreate(enter_config_task, "wifi_cfg", 4096, nullptr, 2, nullptr);
+}
+
+bool wifi_is_connected(void)
+{
+    return s_connected;
 }
 
 void wifi_on_connected(wifi_connected_cb_t cb)    { s_connected_cb = cb; }
 void wifi_on_disconnected(wifi_disconnected_cb_t cb) { s_disconnected_cb = cb; }
-
-bool wifi_is_connected(void)
-{
-    if (s_wifi_event_group == nullptr) return false;
-    return (xEventGroupGetBits(s_wifi_event_group) & WIFI_CONNECTED_BIT) != 0;
-}

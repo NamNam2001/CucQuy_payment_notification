@@ -27,7 +27,11 @@ static lv_obj_t *s_scr_home = nullptr;
 static lv_obj_t *s_scr_qr   = nullptr;
 
 // Widget màn Home
-static lv_obj_t *s_home_title = nullptr;
+static lv_obj_t *s_home_title  = nullptr;
+static lv_obj_t *s_home_wifi   = nullptr;   // icon WiFi góc phải
+
+// Widget màn Config Mode
+static lv_obj_t *s_scr_config  = nullptr;
 
 // Widget màn QR
 static lv_obj_t *s_qr_img        = nullptr;
@@ -156,7 +160,6 @@ static void build_home_screen(void)
 {
     s_scr_home = lv_obj_create(nullptr);
     lv_obj_set_style_bg_color(s_scr_home, lv_color_white(), 0);
-    // Tắt scroll (theo yêu cầu)
     lv_obj_remove_flag(s_scr_home, LV_OBJ_FLAG_SCROLLABLE);
 
     // Chữ "Hello NamPOS" ở giữa
@@ -165,6 +168,56 @@ static void build_home_screen(void)
     lv_obj_set_style_text_color(s_home_title, lv_color_hex(0x0000FF), 0);
     lv_obj_set_style_text_font(s_home_title, &lv_font_montserrat_16, 0);
     lv_obj_align(s_home_title, LV_ALIGN_CENTER, 0, 0);
+
+    // WiFi icon góc trên-phải (dùng ký tự Unicode)
+    s_home_wifi = lv_label_create(s_scr_home);
+    lv_label_set_text(s_home_wifi, LV_SYMBOL_WIFI);   // icon WiFi built-in LVGL
+    lv_obj_set_style_text_color(s_home_wifi, lv_color_hex(0x999999), 0);   // xám = disconnect
+    lv_obj_align(s_home_wifi, LV_ALIGN_TOP_RIGHT, -4, 2);
+}
+
+static void build_config_screen(void)
+{
+    s_scr_config = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(s_scr_config, lv_color_hex(0xFFEB3B), 0);   // nền vàng nổi bật
+    lv_obj_remove_flag(s_scr_config, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Tiêu đề
+    lv_obj_t *title = lv_label_create(s_scr_config);
+    lv_label_set_text(title, "WIFI SETUP");
+    lv_obj_set_style_text_color(title, lv_color_hex(0xCC0000), 0);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 8);
+
+    // Bước 1
+    lv_obj_t *line1 = lv_label_create(s_scr_config);
+    lv_label_set_text(line1, "1. Connect to WiFi:");
+    lv_obj_set_style_text_color(line1, lv_color_black(), 0);
+    lv_obj_align(line1, LV_ALIGN_TOP_MID, 0, 38);
+
+    lv_obj_t *apname = lv_label_create(s_scr_config);
+    lv_label_set_text(apname, "NamPOS-XXXX");
+    lv_obj_set_style_text_color(apname, lv_color_hex(0x0000CC), 0);
+    lv_obj_set_style_text_font(apname, &lv_font_montserrat_16, 0);
+    lv_obj_align(apname, LV_ALIGN_TOP_MID, 0, 58);
+
+    // Bước 2
+    lv_obj_t *line2 = lv_label_create(s_scr_config);
+    lv_label_set_text(line2, "2. Open browser:");
+    lv_obj_set_style_text_color(line2, lv_color_black(), 0);
+    lv_obj_align(line2, LV_ALIGN_TOP_MID, 0, 88);
+
+    lv_obj_t *url = lv_label_create(s_scr_config);
+    lv_label_set_text(url, "192.168.4.1");
+    lv_obj_set_style_text_color(url, lv_color_hex(0xCC0000), 0);
+    lv_obj_set_style_text_font(url, &lv_font_montserrat_16, 0);
+    lv_obj_align(url, LV_ALIGN_TOP_MID, 0, 108);
+
+    // Note
+    lv_obj_t *note = lv_label_create(s_scr_config);
+    lv_label_set_text(note, "to configure WiFi");
+    lv_obj_set_style_text_color(note, lv_color_hex(0x555555), 0);
+    lv_obj_align(note, LV_ALIGN_TOP_MID, 0, 134);
 }
 
 static void build_qr_screen(void)
@@ -221,11 +274,53 @@ esp_err_t display_init(void)
     lvgl_port_lock(portMAX_DELAY);
     build_home_screen();
     build_qr_screen();
+    build_config_screen();
     // Boot vào màn Home
     lv_screen_load(s_scr_home);
     lvgl_port_unlock();
 
     ESP_LOGI(TAG, "Display ready - màn Home");
+    return ESP_OK;
+}
+
+esp_err_t display_show_config_mode(const char *ap_name)
+{
+    if (s_scr_config == nullptr) return ESP_ERR_INVALID_STATE;
+
+    lvgl_port_lock(portMAX_DELAY);
+    // Update AP name trên màn config (nếu được truyền)
+    if (ap_name) {
+        // Tìm label "NamPOS-XXXX" (con thứ 3 trong scr_config) và update
+        // Cách đơn giản: tìm obj có text bắt đầu bằng "NamPOS"
+        uint32_t cnt = lv_obj_get_child_count(s_scr_config);
+        for (uint32_t i = 0; i < cnt; i++) {
+            lv_obj_t *c = lv_obj_get_child(s_scr_config, i);
+            if (lv_obj_check_type(c, &lv_label_class)) {
+                const char *txt = lv_label_get_text(c);
+                if (txt && strstr(txt, "NamPOS")) {
+                    lv_label_set_text(c, ap_name);
+                    break;
+                }
+            }
+        }
+    }
+    lv_screen_load(s_scr_config);
+    lvgl_port_unlock();
+    return ESP_OK;
+}
+
+esp_err_t display_set_wifi_status(bool connected)
+{
+    if (s_home_wifi == nullptr) return ESP_ERR_INVALID_STATE;
+    lvgl_port_lock(portMAX_DELAY);
+    if (connected) {
+        lv_obj_set_style_text_color(s_home_wifi, lv_color_hex(0x00AA00), 0);   // xanh = connected
+        lv_label_set_text(s_home_wifi, LV_SYMBOL_WIFI);
+    } else {
+        lv_obj_set_style_text_color(s_home_wifi, lv_color_hex(0xCC0000), 0);   // đỏ = disconnect
+        lv_label_set_text(s_home_wifi, LV_SYMBOL_CLOSE);                        // dấu X
+    }
+    lvgl_port_unlock();
     return ESP_OK;
 }
 

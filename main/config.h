@@ -24,8 +24,11 @@
 // =============================================================================
 // WIZI / Network config (đổi theo môi trường)
 // =============================================================================
-#define WIFI_SSID           "NubeiO_Fake"
-#define WIFI_PASSWORD       "12345678"
+// WiFi được cấu hình qua captive portal (như xiaozhi-esp32)
+// Lần đầu boot: ESP32 phát AP "NamPOS-XXXX" -> user vào 192.168.4.1 nhập WiFi
+// SSID/password lưu trong NVS (namespace "wifi"), KHÔNG hardcode
+#define WIFI_AP_PREFIX              "NamPOS"
+#define WIFI_CONNECT_TIMEOUT_SEC    60    // sau 60s không kết nối được -> vào config AP
 
 // HiveMQ public test broker - ho tro user/pass tuy y (de test)
 //   - TCP plaintext: mqtt://broker.hivemq.com:1883 (user/pass optional)

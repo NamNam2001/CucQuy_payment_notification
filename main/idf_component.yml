@@ -9,6 +9,7 @@ dependencies:
   lvgl/lvgl: "~9.5.0"
   espressif/esp_lvgl_port: "~2.7.2"
   espressif/esp_audio_codec: "~2.4.1"
+  78/esp-wifi-connect: "~3.1.3"
 
   ## Yêu cầu ESP-IDF tối thiểu
   idf:
