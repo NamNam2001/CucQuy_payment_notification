@@ -1,0 +1,77 @@
+# =============================================================================
+# sdkconfig.defaults - all targets
+# CucQuy Payment Notification (ESP32-WROOM 4MB + ST7735 + PCM5102A)
+# Based on xiaozhi-esp32 config, trimmed for this project.
+# NOTE: keep this file ASCII-only - kconfgen on Windows reads cp1252.
+# =============================================================================
+
+# --- Compiler / C++ ---
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+# Disable C++ exceptions / RTTI to save flash (this project does not use them)
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+CONFIG_COMPILER_CXX_RTTI=n
+
+# --- Bootloader ---
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_BOOTLOADER_SKIP_VALIDATE_ALWAYS=y
+
+# --- Partition table ---
+# 4MB table for ESP32-WROOM (overridden by sdkconfig.defaults.esp32)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# --- FreeRTOS / Task ---
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+
+# --- WiFi (reduce memory usage - from xiaozhi) ---
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=8
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+CONFIG_LIBC_NEWLIB_NANO_FORMAT=y
+
+# --- mbedTLS (for MQTT TLS / HTTPS) ---
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=n
+CONFIG_MBEDTLS_SSL_RENEGOTIATION=n
+# Cert bundle so MQTT-TLS (port 8883) works
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+
+# =============================================================================
+# LVGL 9.5 - only enable widgets needed for QR + label + canvas
+# =============================================================================
+CONFIG_LV_OS_NONE=y
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CLIB_STRING=y
+CONFIG_LV_USE_CLIB_SPRINTF=y
+
+# Widgets REQUIRED for payment QR
+CONFIG_LV_USE_QRCODE=y
+CONFIG_LV_USE_CANVAS=y
+
+# Enable one built-in font (Montserrat 14) for English text/numbers
+# Vietnamese with diacritics needs a custom font (LVGL font converter)
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+
+# Disable unneeded widgets to save 4MB flash
+CONFIG_LV_USE_ANIMIMG=n
+CONFIG_LV_USE_CALENDAR=n
+CONFIG_LV_USE_CHART=n
+CONFIG_LV_USE_KEYBOARD=n
+CONFIG_LV_USE_LED=n
+CONFIG_LV_USE_LIST=n
+CONFIG_LV_USE_MENU=n
+CONFIG_LV_USE_MSGBOX=n
+CONFIG_LV_USE_SPAN=n
+CONFIG_LV_USE_SPINBOX=n
+CONFIG_LV_USE_SPINNER=n
+CONFIG_LV_USE_TABVIEW=n
+CONFIG_LV_USE_TILEVIEW=n
+CONFIG_LV_USE_WIN=n
+
+CONFIG_LV_BUILD_EXAMPLES=n
+CONFIG_LV_BUILD_DEMOS=n

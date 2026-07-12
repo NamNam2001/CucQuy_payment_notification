@@ -1,0 +1,15 @@
+## IDF Component Manager Manifest File
+## CucQuy Payment Notification
+##
+## Chỉ lấy những component THẬT SỰ cần thiết:
+##  - lvgl + esp_lvgl_port : hiển thị QR thanh toán trên ST7735
+##  - esp_audio_codec      : decode MP3 stream từ Google Translate TTS
+##  - (WiFi + MQTT dùng ESP-IDF built-in, không cần wrapper)
+dependencies:
+  lvgl/lvgl: "~9.5.0"
+  espressif/esp_lvgl_port: "~2.7.2"
+  espressif/esp_audio_codec: "~2.4.1"
+
+  ## Yêu cầu ESP-IDF tối thiểu
+  idf:
+    version: '>=5.5.2'

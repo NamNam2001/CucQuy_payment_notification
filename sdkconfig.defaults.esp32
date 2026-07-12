@@ -1,0 +1,14 @@
+# =============================================================================
+# sdkconfig.defaults.esp32 - for regular ESP32 only
+# NOTE: keep this file ASCII-only - kconfgen on Windows reads cp1252.
+# =============================================================================
+
+# Flash 4MB (ESP32-WROOM)
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# Custom 4MB partition table
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/partitions.csv"
+
+# Longer watchdog timeout for plain ESP32 (no PSRAM, slower than S3)
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=20

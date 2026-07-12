@@ -1,0 +1,17 @@
+# =============================================================================
+# Partition table cho ESP32-WROOM 4MB
+# Dựa trên xiaozhi-esp32 partitions/v2/4m.csv
+#
+# Phân bổ: bootloader 0x1000-0x9000, partition table @0x8000
+#   nvs       16KB   - cài đặt (WiFi, MQTT broker, ...)
+#   otadata    8KB   - OTA slot info (dự phòng, chưa dùng)
+#   phy_init   4KB   - RF calibration
+#   factory   ~3MB   - app chính
+#   assets     1MB   - SPIFFS cho file âm thanh noti (WAV) / QR asset
+# =============================================================================
+# Name,   Type, SubType, Offset,   Size,    Flags
+nvs,      data, nvs,     0x9000,   0x4000,
+otadata,  data, ota,     0xd000,   0x2000,
+phy_init, data, phy,     0xf000,   0x1000,
+factory,  app,  factory, 0x10000,  0x2F0000,
+assets,   data, spiffs,  0x300000, 0x100000,
