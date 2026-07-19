@@ -1,12 +1,15 @@
 /**
  * @file notify_app.cc
- * @brief 2-topic workflow: order/create (show QR) + order/paid (báo loa).
+ * @brief 3-topic workflow: order/create (show QR) + order/paid (báo loa) + order/cancel.
  *
  * Topic 1: cucquy/esp_01/order/create  {"order_id","amount","qr"}
  *   → ESP32 hiển thị QR + số tiền (im lặng)
  *
  * Topic 2: cucquy/esp_01/order/paid    {"order_id","amount","sender"}
  *   → ESP32 báo loa + TTS + về màn Home
+ *
+ * Topic 3: cucquy/esp_01/order/cancel  {} (rỗng)
+ *   → ESP32 huỷ QR, về màn hình chính (im lặng)
  */
 #include "notify_app.h"
 #include "config.h"
@@ -130,6 +133,20 @@ static void handle_order_paid(const char *payload, int len)
 }
 
 // ---------------------------------------------------------------------------
+// Handler: order/cancel → huỷ QR, về màn hình chính (im lặng)
+// ---------------------------------------------------------------------------
+static void handle_order_cancel(const char *payload, int len)
+{
+    (void)payload;
+    (void)len;
+    ESP_LOGI(TAG, "[CANCEL] huỷ QR → về màn chính");
+    s_current_order_id[0] = '\0';
+    s_current_amount = 0;
+    s_state = STATE_HOME;
+    display_show_home();
+}
+
+// ---------------------------------------------------------------------------
 // MQTT callback dispatcher
 // ---------------------------------------------------------------------------
 static void on_mqtt_message(const char *topic, const char *payload, int payload_len)
@@ -138,6 +155,8 @@ static void on_mqtt_message(const char *topic, const char *payload, int payload_
         handle_order_create(payload, payload_len);
     } else if (strcmp(topic, MQTT_TOPIC_ORDER_PAID) == 0) {
         handle_order_paid(payload, payload_len);
+    } else if (strcmp(topic, MQTT_TOPIC_ORDER_CANCEL) == 0) {
+        handle_order_cancel(payload, payload_len);
     }
 }
 
@@ -192,7 +211,9 @@ esp_err_t notify_app_init(void)
     mqtt_on_message(on_mqtt_message);
     mqtt_subscribe(MQTT_TOPIC_ORDER_CREATE, 1);
     mqtt_subscribe(MQTT_TOPIC_ORDER_PAID, 1);
+    mqtt_subscribe(MQTT_TOPIC_ORDER_CANCEL, 1);
 
-    ESP_LOGI(TAG, "Subscribed: %s + %s", MQTT_TOPIC_ORDER_CREATE, MQTT_TOPIC_ORDER_PAID);
+    ESP_LOGI(TAG, "Subscribed: %s + %s + %s",
+             MQTT_TOPIC_ORDER_CREATE, MQTT_TOPIC_ORDER_PAID, MQTT_TOPIC_ORDER_CANCEL);
     return ESP_OK;
 }

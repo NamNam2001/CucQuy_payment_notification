@@ -41,6 +41,7 @@
 // 2 topic cho workflow pos: create (show QR) + paid (bao loa)
 #define MQTT_TOPIC_ORDER_CREATE  "cucquy/esp_01/order/create"
 #define MQTT_TOPIC_ORDER_PAID    "cucquy/esp_01/order/paid"
+#define MQTT_TOPIC_ORDER_CANCEL  "cucquy/esp_01/order/cancel"
 
 // Màn hình chính - chữ hiển thị giữa màn hình Home
 #define DISPLAY_HOME_TEXT        "Hello NamPOS"
