@@ -136,7 +136,8 @@ esp_err_t mqtt_init(void)
     mqtt_cfg.buffer.out_size = 1024;
     mqtt_cfg.network.timeout_ms = 10000;
 
-    if (strncmp(MQTT_BROKER_URI, "mqtts://", 8) == 0) {
+    if (strncmp(MQTT_BROKER_URI, "mqtts://", 8) == 0 ||
+        strncmp(MQTT_BROKER_URI, "wss://", 6) == 0) {
         mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
     }
 

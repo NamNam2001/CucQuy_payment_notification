@@ -33,9 +33,9 @@
 // HiveMQ public test broker - ho tro user/pass tuy y (de test)
 //   - TCP plaintext: mqtt://broker.hivemq.com:1883 (user/pass optional)
 //   - TLS:           mqtts://broker.hivemq.com:8883 (user/pass optional)
-#define MQTT_BROKER_URI     "mqtts://broker.hivemq.com:8883"
-#define MQTT_USERNAME       "namnam"
-#define MQTT_PASSWORD       "test12345"
+#define MQTT_BROKER_URI     "wss://mqtt.cucquy.site:443/mqtt"
+#define MQTT_USERNAME       "cucquy"
+#define MQTT_PASSWORD       "REPLACE_WITH_MQTT_PASSWORD"
 #define MQTT_CLIENT_ID      "cucquy-payment-001"
 
 // 2 topic cho workflow pos: create (show QR) + paid (bao loa)
