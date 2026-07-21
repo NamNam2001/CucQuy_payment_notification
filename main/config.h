@@ -109,11 +109,6 @@
 #define AUDIO_I2S_SPK_GPIO_BCLK             GPIO_NUM_14
 #define AUDIO_I2S_SPK_GPIO_LRCK             GPIO_NUM_27
 
-// Mic (INMP441/...) - giữ cho đầy đủ, dự án này KHÔNG dùng mic (chỉ playback)
-// #define AUDIO_I2S_MIC_GPIO_WS               GPIO_NUM_25
-// #define AUDIO_I2S_MIC_GPIO_SCK              GPIO_NUM_26
-// #define AUDIO_I2S_MIC_GPIO_DIN              GPIO_NUM_32
-
 // DMA config (tham khảo xiaozhi audio_codec.h)
 #define AUDIO_CODEC_DMA_DESC_NUM            6
 #define AUDIO_CODEC_DMA_FRAME_NUM           240

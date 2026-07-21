@@ -87,13 +87,17 @@ main/
 | `This .bat file is for Windows CMD.EXE shell only` | Đang chạy trong Git Bash | Dùng `cmd.exe` thay |
 | `espidf.constraints.v5.5.txt doesn't exist` | Sai `IDF_TOOLS_PATH` | Set thành `C:\Users\Nam\.espressif` |
 
-## Thay đổi config WiFi/MQTT
+## Thay đổi config MQTT
 
-Sửa trực tiếp trong `main/config.h`:
+WiFi cấu hình qua **captive portal** lúc chạy (AP `NamPOS-XXXX` → 192.168.4.1),
+KHÔNG hardcode. MQTT sửa trong `main/config.h`:
 ```c
-#define WIFI_SSID           "..."
-#define WIFI_PASSWORD       "..."
-#define MQTT_BROKER_URI     "mqtt://broker.hivemq.com"
-#define MQTT_TOPIC_BALANCE  "cucquy/balance/notify"
+#define MQTT_BROKER_URI     "wss://mqtt.cucquy.site:443/mqtt"
+#define MQTT_USERNAME       "cucquy"
+#define MQTT_PASSWORD       "..."   // set pass THẬT ở local, KHÔNG commit (repo public)
+// Topic (khớp backend CucQuy):
+#define MQTT_TOPIC_ORDER_CREATE  "cucquy/esp_01/order/create"  // hiện QR + số tiền
+#define MQTT_TOPIC_ORDER_PAID    "cucquy/esp_01/order/paid"    // loa "đã nhận"
+#define MQTT_TOPIC_ORDER_CANCEL  "cucquy/esp_01/order/cancel"  // về màn chính
 ```
-Sau đó build + flash lại.
+Broker auth qua RiceService (credential cucquy). Sau khi sửa → build + flash lại.
