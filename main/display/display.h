@@ -9,6 +9,10 @@
 
 #include <esp_err.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Khởi tạo SPI bus, LCD panel ST7735, backlight, và LVGL.
  *        Màn hình bắt đầu ở màn Home ("Hello NamPOS").
@@ -47,3 +51,7 @@ esp_err_t display_set_title(const char *text);
 /** Khóa/unlock LVGL (thread-safe khi update từ task khác). */
 void display_lock(void);
 void display_unlock(void);
+
+#ifdef __cplusplus
+}
+#endif

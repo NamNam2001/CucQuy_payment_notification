@@ -19,6 +19,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Khởi tạo I2S TX cho PCM5102A.
  *
@@ -59,3 +63,7 @@ void audio_set_volume(int volume_pct);
  * @brief Phát một tone beep đơn giản (test loa). Tần số A4 = 440Hz.
  */
 esp_err_t audio_play_beep(int frequency_hz, int duration_ms);
+
+#ifdef __cplusplus
+}
+#endif

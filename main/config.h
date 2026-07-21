@@ -15,8 +15,7 @@
  *   - GPIO 12:     MTDI - tránh dùng làm input (chiến STRAP)
  *   - GPIO 0,2,15: boot strap - cẩn thận khi dùng
  */
-#ifndef _BOARD_CONFIG_H_
-#define _BOARD_CONFIG_H_
+#pragma once
 
 #include <driver/gpio.h>
 #include "esp_lcd_types.h"
@@ -121,5 +120,3 @@
 // =============================================================================
 #define BOOT_BUTTON_GPIO                    GPIO_NUM_0    // nút FLASH trên module
 #define BUILTIN_LED_GPIO                    GPIO_NUM_2
-
-#endif // _BOARD_CONFIG_H_

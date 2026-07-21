@@ -5,7 +5,6 @@
 
 set(SOURCES
     "main.cc"
-    "config.h"
     "display/display.cc"
     "audio/audio.cc"
     "network/wifi.cc"
